@@ -17,7 +17,7 @@ object SingleStepAgentExample {
       client <- LLMConnect.getClient(reader)
       toolRegistry = new ToolRegistry(Seq(WeatherTool.tool))
       agent        = new Agent(client)
-      traceLogPath = "/Users/rory.graves/workspace/home/llm4s/log/single-step-trace.md"
+      traceLogPath = ".log/single-step-trace.md"
       query        = "I'm planning a trip to Paris. What's the weather like there now?"
       _            = println(s"Trace log will be written to: $traceLogPath\n")
       _            = println(s"User Query: $query\n")
@@ -28,12 +28,12 @@ object SingleStepAgentExample {
       _ = {
         var stepCount = 0
         var stat      = state
-        while (stat.status == AgentStatus.InProgress && stepCount < 5) {
+        while ((stat.status == AgentStatus.InProgress || stat.status == AgentStatus.WaitingForTools) && stepCount < 5) {
           println(s"\nRunning step ${stepCount + 1}...")
-          agent.runStep(state) match {
+          agent.runStep(stat) match {
             case Right(newState) =>
               stat = newState
-              println(s"Step completed with status: ${state.status}")
+              println(s"Step completed with status: ${stat.status}")
               // Print the most recent message
               stat.conversation.messages.lastOption.foreach { msg =>
                 println(
@@ -44,7 +44,7 @@ object SingleStepAgentExample {
             case Left(error) =>
               println(s"Error running step: $error")
               stat = stat.withStatus(AgentStatus.Failed(error.toString))
-              agent.writeTraceLog(state, traceLogPath)
+              agent.writeTraceLog(stat, traceLogPath)
           }
           stepCount += 1
         }
